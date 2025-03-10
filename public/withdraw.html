@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Miner - Withdraw Profits</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white min-h-screen font-[Inter]">
+    <div class="container mx-auto px-4 py-8 max-w-3xl">
+        <div class="bg-gray-800 rounded-xl p-8 shadow-xl">
+            <h1 class="text-3xl font-bold mb-6 text-center">Withdraw Mining Profits</h1>
+            
+            <!-- Wallet Connection -->
+            <div class="mb-8 text-center" id="wallet-section">
+                <button id="connect-wallet" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center mx-auto space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    <span>Connect Wallet</span>
+                </button>
+                <p id="wallet-address" class="mt-4 text-gray-400 hidden"></p>
+            </div>
+
+            <!-- Profit Display -->
+            <div class="mb-8 p-6 bg-gray-700 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Available Profits</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="text-center">
+                        <p class="text-gray-400 text-sm">Total Profit</p>
+                        <p id="total-profit" class="text-2xl font-bold text-green-400">0.00 ETH</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-gray-400 text-sm">Gas Cost</p>
+                        <p id="gas-cost" class="text-2xl font-bold text-yellow-400">0.00 ETH</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Withdrawal Section -->
+            <div id="withdrawal-section" class="hidden">
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Withdrawal Details</h2>
+                    <div class="bg-gray-700 p-4 rounded-lg space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Amount to Withdraw:</span>
+                            <span id="withdraw-amount" class="font-semibold">0.00 ETH</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Network Fee:</span>
+                            <span id="network-fee" class="font-semibold">0.00 ETH</span>
+                        </div>
+                        <div class="border-t border-gray-600 my-2 pt-2 flex justify-between">
+                            <span class="text-gray-400">You Will Receive:</span>
+                            <span id="final-amount" class="font-semibold text-green-400">0.00 ETH</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="withdraw-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7l4-4m0 0l4 4m-4-4v18"></path>
+                    </svg>
+                    <span>Withdraw Profits</span>
+                </button>
+            </div>
+
+            <!-- Transaction Status -->
+            <div id="transaction-status" class="mt-6 hidden">
+                <div class="animate-pulse flex items-center justify-center space-x-2 text-blue-400">
+                    <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Processing Transaction...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let provider;
+        let signer;
+        let withdrawalContract;
+
+        async function connectWallet() {
+            try {
+                // Check if MetaMask is installed
+                if (typeof window.ethereum === 'undefined') {
+                    alert('Please install MetaMask to use this feature');
+                    return;
+                }
+
+                // Request account access
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const account = accounts[0];
+
+                // Setup ethers provider and signer
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                signer = provider.getSigner();
+
+                // Update UI
+                document.getElementById('wallet-address').textContent = `Connected: ${account.slice(0,6)}...${account.slice(-4)}`;
+                document.getElementById('wallet-address').classList.remove('hidden');
+                document.getElementById('connect-wallet').classList.add('hidden');
+                document.getElementById('withdrawal-section').classList.remove('hidden');
+
+                // Get and display profits
+                await updateProfitDisplay();
+            } catch (error) {
+                console.error('Error connecting wallet:', error);
+                alert('Failed to connect wallet. Please try again.');
+            }
+        }
+
+        async function updateProfitDisplay() {
+            try {
+                // Get balance and gas price
+                const balance = await provider.getBalance(await signer.getAddress());
+                const gasPrice = await provider.getGasPrice();
+                const gasLimit = 21000; // Standard ETH transfer
+                const gasCost = gasPrice.mul(gasLimit);
+
+                // Update display
+                document.getElementById('total-profit').textContent = `${ethers.utils.formatEther(balance)} ETH`;
+                document.getElementById('gas-cost').textContent = `${ethers.utils.formatEther(gasCost)} ETH`;
+                
+                // Calculate withdrawal amount
+                const withdrawAmount = balance.sub(gasCost);
+                document.getElementById('withdraw-amount').textContent = `${ethers.utils.formatEther(balance)} ETH`;
+                document.getElementById('network-fee').textContent = `${ethers.utils.formatEther(gasCost)} ETH`;
+                document.getElementById('final-amount').textContent = `${ethers.utils.formatEther(withdrawAmount)} ETH`;
+            } catch (error) {
+                console.error('Error updating profit display:', error);
+            }
+        }
+
+        async function withdrawProfits() {
+            try {
+                document.getElementById('withdraw-button').disabled = true;
+                document.getElementById('transaction-status').classList.remove('hidden');
+
+                // Get current balance and gas price
+                const address = await signer.getAddress();
+                const balance = await provider.getBalance(address);
+                const gasPrice = await provider.getGasPrice();
+                const gasLimit = 21000;
+                const gasCost = gasPrice.mul(gasLimit);
+                const withdrawAmount = balance.sub(gasCost);
+
+                if (withdrawAmount.lte(0)) {
+                    throw new Error('Insufficient balance to cover gas costs');
+                }
+
+                // Create and send transaction
+                const tx = {
+                    to: address,
+                    value: withdrawAmount,
+                    gasPrice: gasPrice,
+                    gasLimit: gasLimit
+                };
+
+                const transaction = await signer.sendTransaction(tx);
+                await transaction.wait();
+
+                alert('Withdrawal successful! Transaction hash: ' + transaction.hash);
+                
+                // Update display
+                await updateProfitDisplay();
+            } catch (error) {
+                console.error('Error withdrawing profits:', error);
+                alert('Failed to withdraw. Please try again.');
+            } finally {
+                document.getElementById('withdraw-button').disabled = false;
+                document.getElementById('transaction-status').classList.add('hidden');
+            }
+        }
+
+        // Event Listeners
+        document.getElementById('connect-wallet').addEventListener('click', connectWallet);
+        document.getElementById('withdraw-button').addEventListener('click', withdrawProfits);
+
+        // Handle account changes
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', function (accounts) {
+                window.location.reload();
+            });
+        }
+    </script>
+</body>
+</html>
